@@ -1,7 +1,6 @@
 import { Stack } from "./dataStruct/stack.ts";
-//import { Result, Ok, Err, Option, Some, None, EnumBase } from './dataStruct/enums.ts'
+import { Result, Ok, Err, Option, Some, None, EnumBase } from './dataStruct/enums.ts'
 export { Stack, Result, Ok, Err, Option, Some, None }
-import { Result, Ok, Err, Option, Some, None, EnumBase } from 'https://cdn.skypack.dev/rusty-enums?dts'
 export enum Scope {
   FILE_ROOT,
   PARENT,
