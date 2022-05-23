@@ -18,10 +18,10 @@ export enum CodePlace {
 export class ABorNA<A, B> extends EnumBase<{
   A: A, B: B, NA: undefined
 }> {
-  static A<NDA>(data: NDA){
+  static A<NDA>(data: NDA) {
     return new ABorNA<NDA, any>("A", data)
   }
-  static B<NDB>(data: NDB){
+  static B<NDB>(data: NDB) {
     return new ABorNA<NDB, any>("B", data)
   }
   static NA = new ABorNA<any, any>("NA", undefined)
@@ -72,7 +72,7 @@ type ScopeBlock = {
 type IndexGetter = (partStart: number, partEnd: number, scope: Scope, place: CodePlace) => number
 
 const getOpenBlockInInterval = (blocks: ScopeBlock[], partStart: number, partEnd: number, outer = true): Option<ScopeBlock> => {
-  let found
+  let found: ScopeBlock | undefined
   if (outer) {
     found = blocks.find(
       ({ innerStart, end }) => partStart <= innerStart && innerStart <= partEnd && partEnd <= end // ? idk if it's < or <=
@@ -112,7 +112,10 @@ function getIndexFromPosition(
     }
     if (place === CodePlace.END) {
       return getOpenBlockInInterval(blocks, partStart, partEnd, false)
-        .expect('Scope not opened; cannot find child scope')
+        .expect(
+          'Scope not opened; cannot find child scope:\n "'
+          + code.substring(partStart, partEnd)
+          + '"')
         .end
     }
     throw new Error('You cannot use BEFORE and AFTER for Scope.CHILD option')
@@ -124,7 +127,7 @@ function getIndexFromPosition(
       }
       case CodePlace.AFTER: {
         return getOpenBlockInInterval(blocks, partStart, partEnd).match({
-          Some: (block) => block.end+1,
+          Some: (block) => block.end + 1,
           None: () => partEnd
         })
       }
@@ -169,7 +172,7 @@ const matchedExpIndexes = (code: string, regex: RegExp, start: number) => {
   }
   return [match.index, regex.lastIndex]
 }
-export const analyzeBrackets = (code: string): Result<CodeScopeBlocks, string> => {
+export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   const blocks: ScopeBlock[] = []
   const codeScopeBlocks: CodeScopeBlocks = {
     blocks,
@@ -213,6 +216,7 @@ export const analyzeBrackets = (code: string): Result<CodeScopeBlocks, string> =
           parentFuncOrRoot: parentStack.peek()
         } as ScopeBlock
         blockStack.push(['{', funcScope])
+        blocks.push(funcScope)
         parentStack.push(funcScope)
         continue
       }
@@ -228,7 +232,7 @@ export const analyzeBrackets = (code: string): Result<CodeScopeBlocks, string> =
     } else if (char === '}' || char === ']' || char === ')') {
       const top = blockStack.peek()
       if (!top) {
-        return Err('closing bracket without opening')
+        throw new Error('closing bracket without opening')
       }
       if (bracketPairs.get(top[0]) === char) {
         // closing a scope
@@ -239,9 +243,9 @@ export const analyzeBrackets = (code: string): Result<CodeScopeBlocks, string> =
           parentStack.pop()
         }
       } else {
-        return Err('unmatched pair of bracket:' + top + char)
+        throw new Error('unmatched pair of bracket:' + top + char)
       }
     }
   }
-  return Ok(codeScopeBlocks)
+  return codeScopeBlocks
 }

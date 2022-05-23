@@ -1,4 +1,4 @@
-import { assert, fail, assertEquals } from "https://deno.land/std/testing/asserts.ts";
+// import { assert, fail, assertEquals } from "https://deno.land/std/testing/asserts.ts";
 import { Transformer, Scope, CodePlace, assertObj } from '../src/index.ts'
 // Deno.test({
 //   name: "tr-1",
@@ -7,28 +7,7 @@ import { Transformer, Scope, CodePlace, assertObj } from '../src/index.ts'
 //   }
 // });
 
-`
-import Comp from '../file'
 
-export default (_bjsx_comp_attr)=>{
-  let { attr1, children } = _bjsx_comp_attr
-  const refs = {}
-  const self = Blue.r('div', null, 
-    Blue.r(Comp, {ref: [refs, 'bjsx_ref_0'], class: 'hello'})
-  )
-  if(import.meta.hot){
-    self._bjsx_hmr_update = (Comp, attr) =>{
-      const newElem = Blue.r(Comp, attr, _bjsx_comp_attr.children)
-      self.before(newElem)
-      self.remove()
-      return newElem
-    }
-    import.meta.hot.accept('../file.tsx', ({default: Comp})=>{
-      refs.bjsx_ref_0 = refs.bjsx_ref_0._bjsx_hmr_update(Comp, {class: 'hello'})
-    })
-  }
-  return self
-}`;
 
 `const ppp = Blue.r(Comp2, { class: 'hello' })
 
@@ -95,9 +74,9 @@ export default (_bjsx_comp_attr)=>{
     // update itself
     import.meta.hot.accept(({ default })=>{
       const newElem = Blue.r(default, _bjsx_comp_attr, _bjsx_comp_attr.children)
+      self.__newestElem = newElem
       self.before(newElem)
       self.remove()
-      self.__newestElem = newElem
     })
   }
   return self
@@ -160,61 +139,96 @@ function BB({ children }){
 
 document.body.append(Blue.r(AA, null))
 `
+export default () => { }
+export const Unko = () => { }
+const Unko2 = () => { }
+
+export { Unko2 }
+
 const t0 = new Transformer(code)
+// arrow functions into normal functions
 t0.addTransform({
-  regex: /\) *=> *\n? *Blue.r\(/g,
-  replace() {
-    return ')=>{ const self = Blue.r('
+  regex: /export +(?:(?:default)|(?:const (?<name>[A-Z]\w*) *=)) +\((?<param>[\w, {}\[\]]*)\) *=> *\n? *(?:(?<bracket>{)|(?:Blue.r\())/g,
+  replaceWGroup({ name, param, bracket }) {
+    let replacement = ''
+    if (name) {
+      replacement = `export function ${name}(${param}){`
+    } else {
+      replacement = `export default function(${param}){`
+    }
+    if (!bracket) {
+      replacement += ' const self = Blue.r('
+    }
+    return replacement
   },
-  add() {
-    return [{
-      adding: '; return self }',
-      scope: Scope.SAME,
-      place: CodePlace.AFTER
-    }]
+  addWGroup({ bracket }) {
+    const adding = []
+    if (!bracket) {
+      adding.push({
+        adding: '; return self }',
+        scope: Scope.SAME,
+        place: CodePlace.AFTER
+      })
+    }
+    return adding
   }
 })
-t0.addTransform({
-  regex: /function *(?<name>[A-Z][\w]*)\((?<param>[\w, {}\[\]]*)\)/g,
-  replace(match) {
-    const { groups } = match
-    assertObj(groups)
-    return `const ${groups.name} = (${groups.param}) =>`
-  }
-})
+
 code = t0.transform()
 
+
+const SELF_UPDATER = (expt_name: string) =>
+  `if(import.meta.hot){
+  self.__newestElem = self
+  import.meta.hot.accept(({ ${expt_name} })=>{
+    const newElem = Blue.r(default, _bjsx_comp_attr, _bjsx_comp_attr.children)
+    self.__newestElem = newElem
+    self.before(newElem)
+    self.remove()
+  })
+}
+`
 const t1 = new Transformer(code)
 t1.addTransform({
-  regex: /\( *(?<param>{[\w, ]*}) *\) *=> *\{/g,
-  replace(_) {
-    return "(_bjsx_comp_attr)=>{"
+  regex: /(?<rest>export(?: +default)? +function(?: +[A-Z]\w*)? *)\( *(?<param>{[\w, ]*}) *\) *\{/g,
+  replaceWGroup({ rest }) {
+    return `${rest}(_bjsx_comp_attr){`
   },
-  addWGroup(groups) {
+  addWGroup({ param }) {
     return [{
-      adding: `let ${groups.param} = _bjsx_comp_attr;`,
+      adding: `let ${param} = _bjsx_comp_attr;`,
       scope: Scope.CHILD,
       place: CodePlace.START
     }]
   }
 })
+
 t1.addTransform({
-  regex: /Blue.r\(([A-Z][\w]*), \)/g,
+  regex: /export(?: +default)? +function(?: +(?<name>[A-Z]\w*))? *\([\w{},: ]*\) *\{/g,
+  nestWGroup({ name }, range) {
+    return [
+      {
+        regex: /return \w+/g,
+        add() {
+          return [{
+            adding: SELF_UPDATER(name || 'default'),
+            scope: Scope.SAME,
+            place: CodePlace.BEFORE
+          }]
+        }
+      },
+      {
+        regex: /ref: *\[ *[\w]+, *['"](?<name>[\w]*)['"]\]/g,
+        WGroup({ name }) {
+          t1.addTransform({
+            regex: new RegExp(`${name}.`),
+            replace: () => `${name}.__newestElem.`
+          }, range)
+        }
 
-})
-t1.addTransform({
-  regex: /ref: *\[ *(?<refs>[\w]+), *['"](?<name>[\w]*)['"]\]/g,
-  addWGroup(groups){
-    const { refs, name } = groups
-
-    t1.addTransform({
-      regex: new RegExp(``),
-      replace: () => ``
-    })
-
-    return []
+      }
+    ]
   }
-
 })
 
 const result = t1.transform()
