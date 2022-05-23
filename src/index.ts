@@ -74,10 +74,10 @@ export class Transformer {
       const start = match.index, end = regex.lastIndex
       if (range && range[1] < end) break
       matchList.match({
-        A: (list) => {// @ts-ignore: match is RegExpExecArray 
+        A: (list) => {// @ts-ignore: match is not null 
           list.push(match)
         },
-        B: (list) => {// @ts-ignore: match is RegExpExecArray 
+        B: (list) => {// @ts-ignore: match is not null 
           list.push(getGroups(match))
         },
         NA: () => { }
