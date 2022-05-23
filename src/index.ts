@@ -27,7 +27,7 @@ type AddTransformParam = {
   })[],
   nestWGroup?: (
     groups: MatchGroups,
-    range?: [number, number]
+    range: [number, number]
   ) => AddTransformParam[],
   getAllMatches?: (matches: RegExpExecArray[]) => void
   getAllGroups?: (matches: MatchGroups[]) => void
@@ -66,13 +66,13 @@ export class Transformer {
     } else {
       matchList = ABorNA.NA
     }
+    if (range) {
+      regex.lastIndex = range[0]
+    }
     while ((match = regex.exec(this.code)) !== null) {
       // const { /* indices, */ groups } = match
       const start = match.index, end = regex.lastIndex
-      if(range){
-        if(start < range[0]) continue
-        if(range[1] < end) break
-      }
+      if (range && range[1] < end) break
       matchList.match({
         A: (list) => {// @ts-ignore: match is RegExpExecArray 
           list.push(match)
@@ -84,12 +84,18 @@ export class Transformer {
       })
 
       if (replace || replaceWGroup) {
-        if (
-          /* true if no overlap */
-          this.modifying.every(({ range: [mStart, mEnd] }) =>
-            !(mStart <= start && start < mEnd) && !(mStart < end && end <= mEnd)
-          )
-        ) {
+        const overlap = this.modifying.find(({ range: [mStart, mEnd] }) =>
+          (mStart <= start && start < mEnd) || (mStart < end && end <= mEnd)
+        )
+        if (overlap) {
+          throw new Error(
+            'Overlapped Replacement:\n'
+            + '-----Trying to modify range: -----\n'
+            + this.code.substring(start, end)
+            + "\n-----Overlaped with: -----\n"
+            + this.code.substring(...overlap.range)
+            + "\n--------------------------")
+        } else {
           if (replaceWGroup) {
             this.modifying.push({
               range: [start, end],
@@ -101,8 +107,6 @@ export class Transformer {
               replaceWith: replace(match)
             })
           }
-        } else {
-          throw new Error("Overlapped Replacement")
         }
       }
       let addingInfo: Array<{ adding: string; scope: Scope; place: CodePlace; }> | undefined;
@@ -125,10 +129,10 @@ export class Transformer {
           }
         })
 
-        if(nestWGroup){
+        if (nestWGroup) {
           const blockStart = scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.START)
           const blockEnd = scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.END)
-          
+
           nestWGroup(getGroups(match), [blockStart, blockEnd]).forEach((transform) => {
             this.addTransform(transform, [blockStart, blockEnd])
           })

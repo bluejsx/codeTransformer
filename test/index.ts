@@ -124,12 +124,12 @@ export const AA = ({ children }) => Blue.r('div', null, children)
 /*
   {
 */
-function BB({ children }){
+export function BB({ children }){
   const reff = getRefs<{
     p: 'progress'
   }>()
   const self = Blue.r('div', null, 
-    Blue.r('progress', { value: 5, max: 10, ref: [reff, 'p'] }),
+    Blue.r(Progress, { value: 5, max: 10, ref: [reff, 'p'] }),
     children
   )
   const { p } = reff
@@ -221,8 +221,8 @@ t1.addTransform({
         regex: /ref: *\[ *[\w]+, *['"](?<name>[\w]*)['"]\]/g,
         WGroup({ name }) {
           t1.addTransform({
-            regex: new RegExp(`${name}.`),
-            replace: () => `${name}.__newestElem.`
+            regex: new RegExp(`[^\w]${name}\\.`, 'g'),
+            replace: (match) => `${match[0]}__newestElem.`
           }, range)
         }
 
