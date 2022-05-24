@@ -1,6 +1,9 @@
 import { Stack } from "./dataStruct/stack.ts";
 import { Result, Ok, Err, Option, Some, None, EnumBase } from './dataStruct/enums.ts'
 export { Stack, Result, Ok, Err, Option, Some, None }
+/**
+ * specifies scope
+ */
 export enum Scope {
   FILE_ROOT,
   PARENT,
@@ -8,6 +11,9 @@ export enum Scope {
   SAME,
   CHILD
 }
+/**
+ * specifies position
+ */
 export enum CodePlace {
   START,
   BEFORE,
@@ -179,6 +185,10 @@ const matchedExpIndexes = (code: string, regex: RegExp, start: number) => {
   }
   return [match.index, regex.lastIndex]
 }
+/**
+ * Analyzes the brackets in the code then 
+ * creates object that has scope info
+ */
 export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   const blocks: ScopeBlock[] = []
   const codeScopeBlocks: CodeScopeBlocks = {

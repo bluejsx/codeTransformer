@@ -1,6 +1,4 @@
-
-import { EnumBase } from "./dataStruct/enums.ts";
-import { Stack, Scope, CodePlace, Option, CodeScopeBlocks, None, analyzeBrackets, Some, ABorNA } from "./util.ts";
+import { Scope, CodePlace, Option, CodeScopeBlocks, None, analyzeBrackets, Some, ABorNA } from "./util.ts";
 export { Scope, CodePlace }
 
 type MatchGroups = {
@@ -9,15 +7,31 @@ type MatchGroups = {
 
 type AddTransformParam = {
   regex: RegExp,
+  /**
+   * replaces the matched range with the returning string.
+   * Takes in match object.
+   */
   replace?: (match: RegExpExecArray) => string
+  /**
+   * replaces the matched range with the returning string.
+   * Takes in matched groups object
+   */
   replaceWGroup?: (
     groups: MatchGroups
   ) => string
+  /**
+   * adds code in specified code area.
+   * Takes in match object.
+   */
   add?: (match: RegExpExecArray) => ({
     adding: string,
     scope: Scope,
     place: CodePlace
   })[],
+  /**
+   * adds code in specified code area.
+   * Takes in matched groups object
+   */
   addWGroup?: (
     groups: MatchGroups
   ) => ({
@@ -25,22 +39,60 @@ type AddTransformParam = {
     scope: Scope,
     place: CodePlace
   })[],
+  /**
+   * It allows nesting and creating additional `AddTransformParam` manipulation
+   * within the scope that starts from the matched area.
+   * 
+   * Takes in match object and index range of matched part.
+   * 
+   * The range would be useful to use with `.addTransform({...}, range)`
+   */
+  nest?: (match: RegExpExecArray, range: [number, number]) => AddTransformParam[],
+  /**
+   * It allows nesting and creating additional `AddTransformParam` manipulation
+   * within the scope that starts from the matched area.
+   * 
+   * Takes in matched group object and index range of matched part.
+   * 
+   * The range would be useful to use with `.addTransform({...}, range)`
+   */
   nestWGroup?: (
     groups: MatchGroups,
     range: [number, number]
   ) => AddTransformParam[],
-  nest?: (match: RegExpExecArray, range: [number, number]) => AddTransformParam[],
+  /**
+   * takes in matched groups object
+   */
+  WGroup?: (groups: MatchGroups) => void
   getAllMatches?: (matches: RegExpExecArray[]) => void
   getAllGroups?: (matches: MatchGroups[]) => void
-  WGroup?: (matches: MatchGroups) => void
 }
+/**
+ * Takes in match object and returns matched groups object.
+ * 
+ * Throws error if matched groups object is not found.
+ */
 const getGroups = ({ groups }: RegExpExecArray): MatchGroups => {
   if (!groups) throw new Error('`match.groups` not defined')
   return groups
 }
 
 
-
+/**
+ * Usage:
+ * ```ts
+ * // create code transformer
+ * const t1 = new Transformer(code)
+ * t1.addTransform({
+ *   // add code transform rules
+ * })
+ * t1.addTransform({
+ *   // add code transform rules
+ * })
+ * // get result code
+ * const result = t1.transform()
+ * ```
+ */
 export class Transformer {
   private modifying: {
     range: [number, number],
@@ -49,7 +101,33 @@ export class Transformer {
   scopeBlocks: Option<CodeScopeBlocks> = None
   constructor(private code: string) {
   }
-
+  /**
+   * Example:
+   * ```ts
+   * const t = new Transformer('Yay! Hello, sir!')
+   * t.addTransform({
+   *   regex: /Hello, (?<name>\w+)!/g,
+   *   replaceWGroup({ name }){
+   *     return `Sup, ${name}!!!`
+   *   }
+   * })
+   * t.transform() === 'Yay! Sup, sir!!!'
+   * ```
+   * 
+   * ### Description
+   * 
+   * Each manipulation function that has `WGroup` in its name
+   * takes in `match.groups` instead of `match`.
+   * 
+   * These manipulation processes often utilize
+   * [capturing groups](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Groups_and_Ranges#using_groups).
+   * 
+   * - **`match`**
+   *   - the return value of [`RegExp.exec()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/exec).
+   * - **`match.groups`**
+   *   - undefined if no named capturing group is present in regex
+   * 
+   */
   addTransform(
     {
       regex, replace, add, addWGroup, replaceWGroup,
@@ -173,6 +251,11 @@ export class Transformer {
       _: () => { }
     })
   }
+  /**
+   * Call this method after 
+   * registering all transforming rules with `addTransform`
+   * @returns transformed result code
+   */
   transform() {
     let shift = 0
     let { code } = this

@@ -68,7 +68,9 @@ export default (_bjsx_comp_attr)=>{
   )
   const { c2 } = refs
   setInterval(()=>c2.__newestElem.v++, 1000)
-  c2.
+  c2.aa = 3
+  c2.__assignProp('aa')
+  c2.bb(78)
   if(import.meta.hot){
     self.__newestElem = self
     // update itself
