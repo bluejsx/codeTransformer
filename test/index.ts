@@ -124,7 +124,7 @@ export const AA = ({ children }) => Blue.r('div', null, children)
 /*
   {
 */
-export function BB({ children }){
+export const BB = ({ children })=>{
   const reff = getRefs<{
     p: 'progress'
   }>()
@@ -134,6 +134,9 @@ export function BB({ children }){
   )
   const { p } = reff
   p.value = 90
+  const { unko, ahyo } = p
+  unko.get(4)
+  ahyo(345)
   return self
 }
 
@@ -177,14 +180,14 @@ t0.addTransform({
 code = t0.transform()
 
 
-const SELF_UPDATER = (expt_name: string) =>
+const SELF_UPDATER = (self_name: string, expt_name: string) =>
   `if(import.meta.hot){
-  self.__newestElem = self
+  ${self_name}.__newestElem = ${self_name}
   import.meta.hot.accept(({ ${expt_name} })=>{
-    const newElem = Blue.r(default, _bjsx_comp_attr, _bjsx_comp_attr.children)
-    self.__newestElem = newElem
-    self.before(newElem)
-    self.remove()
+    const newElem = Blue.r(${expt_name}, _bjsx_comp_attr, _bjsx_comp_attr.children)
+    ${self_name}.__newestElem = newElem
+    ${self_name}.before(newElem)
+    ${self_name}.remove()
   })
 }
 `
@@ -208,25 +211,43 @@ t1.addTransform({
   nestWGroup({ name }, range) {
     return [
       {
-        regex: /return \w+/g,
-        add() {
+        regex: /return (?<self>\w+)/g,
+        addWGroup({ self }) {
           return [{
-            adding: SELF_UPDATER(name || 'default'),
+            adding: SELF_UPDATER(self, name || 'default'),
             scope: Scope.SAME,
             place: CodePlace.BEFORE
           }]
         }
       },
       {
-        regex: /ref: *\[ *[\w]+, *['"](?<name>[\w]*)['"]\]/g,
-        WGroup({ name }) {
-          t1.addTransform({
-            regex: new RegExp(`[^\w]${name}\\.`, 'g'),
-            replace: (match) => `${match[0]}__newestElem.`
-          }, range)
+        regex: /Blue\.r\([A-Z]\w*/g,
+        nest() {
+          return [{
+            regex: /ref: *\[ *[\w]+, *['"](?<name>[\w]*)['"]\]/g,
+            WGroup({ name }) {
+              t1.addTransform({
+                regex: new RegExp(`[^\w]${name}\\.`, 'g'),
+                replace: (match) => `${match[0]}__newestElem.`
+              }, range)
+              t1.addTransform({
+                regex: new RegExp(`{(?<tookProp>[\\w\\n, ]+)} *= *${name}`, 'g'),
+                WGroup({ tookProp }){
+                  tookProp.replace(/[\n ]+/g, '').split(',').forEach(prop=>{
+                    t1.addTransform({
+                      regex: new RegExp(`([^\w])${prop}([\\.\\(])`, 'g'),
+                      replace(match){
+                        return `${match[1]}${name}.__newestElem.${prop}${match[2]}`
+                      }
+                    }, range)
+                  })
+                }
+              }, range)
+              
+            }
+          }]
         }
-
-      }
+      },
     ]
   }
 })

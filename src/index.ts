@@ -29,6 +29,7 @@ type AddTransformParam = {
     groups: MatchGroups,
     range: [number, number]
   ) => AddTransformParam[],
+  nest?: (match: RegExpExecArray, range: [number, number]) => AddTransformParam[],
   getAllMatches?: (matches: RegExpExecArray[]) => void
   getAllGroups?: (matches: MatchGroups[]) => void
   WGroup?: (matches: MatchGroups) => void
@@ -52,7 +53,8 @@ export class Transformer {
   addTransform(
     {
       regex, replace, add, addWGroup, replaceWGroup,
-      getAllMatches, getAllGroups, nestWGroup, WGroup
+      getAllMatches, getAllGroups, nestWGroup, nest,
+      WGroup
     }: AddTransformParam,
     range?: [number, number]
   ) {
@@ -117,7 +119,7 @@ export class Transformer {
         addingInfo = add(match)
       }
       WGroup?.(getGroups(match))
-      if (addingInfo || nestWGroup) {
+      if (addingInfo || nestWGroup || nest) {
         const scopeBlocks = this.scopeBlocks.match({
           // previous `addTransform` call already cached scopeBlocks.
           Some: (blocks) => blocks,
@@ -128,13 +130,18 @@ export class Transformer {
             return blocks
           }
         })
+        if (nestWGroup || nest) {
+          const range = [
+            scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.START),
+            scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.END)
+          ] as [number, number]
 
-        if (nestWGroup) {
-          const blockStart = scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.START)
-          const blockEnd = scopeBlocks.getIndex(start, end, Scope.CHILD, CodePlace.END)
-
-          nestWGroup(getGroups(match), [blockStart, blockEnd]).forEach((transform) => {
-            this.addTransform(transform, [blockStart, blockEnd])
+          (
+            nestWGroup?.(getGroups(match), range)
+            || nest?.(match, range)
+            || []
+          ).forEach((transform) => {
+            this.addTransform(transform, range)
           })
         }
         addingInfo?.forEach(({ adding, scope, place }) => {

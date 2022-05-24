@@ -32,14 +32,21 @@ bracketPairs.set('{', '}')
 bracketPairs.set('[', ']')
 bracketPairs.set('(', ')')
 
-const getNext = (regex: RegExp, code: string, start: number, margin = 0) => {
+/**
+ * @returns first index of next pattern match
+ */
+const getNext = (regex: RegExp, code: string, start: number, getEnd = false) => {
   regex.lastIndex = start + 1
   const match = regex.exec(code)
   if (!match) {
     return code.length;
   }
-  return match.index + margin
+  if(getEnd) return regex.lastIndex
+  return match.index
 }
+/**
+ * @returns index right after the end of the comment
+ */
 const skipComments = (code: string, index: number): Option<number> => {
   const char = code.charAt(index)
   if (char === '/') {
@@ -47,17 +54,17 @@ const skipComments = (code: string, index: number): Option<number> => {
 
     if (nextChar === '/') {
       // single line comment
-      return Some(getNext(/\n/g, code, index + 1, 1))
+      return Some(getNext(/\n/g, code, index + 1, true))
     } else if (nextChar === '*') {
       // multi line comment
-      return Some(getNext(/\*\//g, code, index + 1, 2))
+      return Some(getNext(/\*\//g, code, index + 1, true))
     }
   } else if (char === "'") {
-    return Some(getNext(/'/g, code, index))
+    return Some(getNext(/[^\\]'/g, code, index, true))
   } else if (char === '"') {
-    return Some(getNext(/"/g, code, index))
+    return Some(getNext(/[^\\]"/g, code, index, true))
   } else if (char === "`") {
-    return Some(getNext(/`/g, code, index))
+    return Some(getNext(/[^\\]`/g, code, index, true))
   }
 
   return None
@@ -196,7 +203,7 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   for (let i = 0, len = code.length; i < len; i++) {
     if (
       skipComments(code, i)
-        .if_let("Some", (skipIndex) => i = skipIndex)
+        .if_let("Some", (skipIndex) => i = skipIndex - 1)
     ) {
       continue
     }
