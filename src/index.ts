@@ -11,14 +11,14 @@ type AddTransformParam = {
    * replaces the matched range with the returning string.
    * Takes in match object.
    */
-  replace?: (match: RegExpExecArray) => string
+  replace?: (match: RegExpExecArray) => string | undefined
   /**
    * replaces the matched range with the returning string.
    * Takes in matched groups object
    */
   replaceWGroup?: (
     groups: MatchGroups
-  ) => string
+  ) => string | undefined
   /**
    * adds code in specified code area.
    * Takes in match object.
@@ -176,15 +176,14 @@ export class Transformer {
             + this.code.substring(...overlap.range)
             + "\n--------------------------")
         } else {
-          if (replaceWGroup) {
+          let replaceWith: string | undefined
+          if(replaceWGroup) replaceWith = replaceWGroup(getGroups(match))
+          else if(replace) replaceWith = replace(match)
+
+          if(replaceWith){
             this.modifying.push({
               range: [start, end],
-              replaceWith: replaceWGroup(getGroups(match))
-            })
-          } else if (replace) {
-            this.modifying.push({
-              range: [start, end],
-              replaceWith: replace(match)
+              replaceWith
             })
           }
         }

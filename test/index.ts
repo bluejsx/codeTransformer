@@ -130,8 +130,10 @@ export const BB = ({ children })=>{
   const reff = getRefs<{
     p: 'progress'
   }>()
+  const pp = Blue.r(Brogress, null)
   const self = Blue.r('div', null, 
     Blue.r(Progress, { value: 5, max: 10, ref: [reff, 'p'] }),
+    pp,
     children
   )
   const { p } = reff
@@ -139,6 +141,8 @@ export const BB = ({ children })=>{
   const { unko, ahyo } = p
   unko.get(4)
   ahyo(345)
+
+  pp.er = 90
   return self
 }
 
@@ -153,7 +157,7 @@ export { Unko2 }
 const t0 = new Transformer(code)
 // arrow functions into normal functions
 t0.addTransform({
-  regex: /export +(?:(?:default)|(?:const (?<name>[A-Z]\w*) *=)) +\((?<param>[\w, {}\[\]]*)\) *=> *\n? *(?:(?<bracket>{)|(?:Blue.r\())/g,
+  regex: /export +(?:default|const (?<name>[A-Z]\w*) *=) *\((?<param>[\w, {}\[\]]*)\) *=> *\n? *(?:(?<bracket>{)|Blue.r\()/g,
   replaceWGroup({ name, param, bracket }) {
     let replacement = ''
     if (name) {
@@ -207,10 +211,30 @@ t1.addTransform({
     }]
   }
 })
-
 t1.addTransform({
   regex: /export(?: +default)? +function(?: +(?<name>[A-Z]\w*))? *\([\w{},: ]*\) *\{/g,
   nestWGroup({ name }, range) {
+
+    const modElem = (elem: string) => {
+      t1.addTransform({
+        regex: new RegExp(`[^\\w]${elem}\\.`, 'g'),
+        replace: (match) => `${match[0]}__newestElem.`
+      }, range)
+      t1.addTransform({
+        regex: new RegExp(`{(?<tookProp>[\\w\\n, ]+)} *= *${elem}`, 'g'),
+        WGroup({ tookProp }) {
+          tookProp.replace(/[\n ]+/g, '').split(',').forEach(prop => {
+            t1.addTransform({
+              regex: new RegExp(`([^\\w])${prop}([\\.\\(])`, 'g'),
+              replace(match) {
+                return `${match[1]}${elem}.__newestElem.${prop}${match[2]}`
+              }
+            }, range)
+          })
+        }
+      }, range)
+    }
+    
     return [
       {
         regex: /return (?<self>\w+)/g,
@@ -223,31 +247,24 @@ t1.addTransform({
         }
       },
       {
-        regex: /Blue\.r\([A-Z]\w*/g,
-        nest() {
-          return [{
-            regex: /ref: *\[ *[\w]+, *['"](?<name>[\w]*)['"]\]/g,
-            WGroup({ name }) {
-              t1.addTransform({
-                regex: new RegExp(`[^\w]${name}\\.`, 'g'),
-                replace: (match) => `${match[0]}__newestElem.`
-              }, range)
-              t1.addTransform({
-                regex: new RegExp(`{(?<tookProp>[\\w\\n, ]+)} *= *${name}`, 'g'),
-                WGroup({ tookProp }){
-                  tookProp.replace(/[\n ]+/g, '').split(',').forEach(prop=>{
-                    t1.addTransform({
-                      regex: new RegExp(`([^\w])${prop}([\\.\\(])`, 'g'),
-                      replace(match){
-                        return `${match[1]}${name}.__newestElem.${prop}${match[2]}`
-                      }
-                    }, range)
-                  })
-                }
-              }, range)
-              
-            }
-          }]
+        regex: /(?:(?:const|let) +(?<varname>\w+) *= *)?(?<rest>Blue\.r\([A-Z]\w*)/g,
+        replaceWGroup({ varname, rest }) {
+          if (varname) {
+            return `let ${varname} = ${rest}`
+          }
+        },
+        nestWGroup({ varname }) {
+          if (varname) {
+            modElem(varname)
+            return [] as ReturnType<NonNullable<typeof this.nestWGroup>>
+          } else {
+            return [{
+              regex: /ref: *\[ *[\w]+, *['"](?<refname>[\w]*)['"]\]/g,
+              WGroup({ refname }) {
+                modElem(refname)
+              }
+            }]
+          }
         }
       },
     ]

@@ -266,3 +266,37 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   }
   return codeScopeBlocks
 }
+
+const analyzeBrackets2 = (code: string): CodeScopeBlocks => {
+  const blocks: ScopeBlock[] = []
+  const codeScopeBlocks: CodeScopeBlocks = {
+    blocks,
+    getIndex: (
+      partStart,
+      partEnd,
+      scope,
+      place
+    ) => getIndexFromPosition(code, blocks, partStart, partEnd, scope, place)
+  }
+  const reg_comments = /(?<b>['"`])(?:(?!\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
+  const reg_brackets = /[{\[\(}\]\)]/g
+  const blockStack = new Stack<[string, ScopeBlock]>()
+  const parentStack = new Stack<ScopeBlock>()
+  const root = {
+    outerStart: 0,
+    innerStart: 0,
+    end: code.length,
+  } as ScopeBlock
+  root.parentFuncOrRoot = root
+  parentStack.push(root)
+  const comment_ranges: [number, number][] = []
+  let match: RegExpExecArray | null;
+  while ((match = reg_comments.exec(code)) !== null) {
+    comment_ranges.push([match.index, reg_comments.lastIndex])
+  }
+  while ((match = reg_brackets.exec(code)) !== null) {
+    const start = match.index, end = reg_brackets.lastIndex
+    comment_ranges
+  }
+  return codeScopeBlocks
+}
