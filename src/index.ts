@@ -1,4 +1,4 @@
-import { Scope, CodePlace, Option, CodeScopeBlocks, None, analyzeBrackets, Some, ABorNA } from "./util.ts";
+import { Scope, CodePlace, Option, CodeScopeBlocks, None, analyzeBrackets, Some } from "./util.ts";
 export { Scope, CodePlace }
 
 type MatchGroups = {
@@ -27,7 +27,7 @@ type AddTransformParam = {
     adding: string,
     scope: Scope,
     place: CodePlace
-  })[],
+  })[] | undefined,
   /**
    * adds code in specified code area.
    * Takes in matched groups object
@@ -38,7 +38,7 @@ type AddTransformParam = {
     adding: string,
     scope: Scope,
     place: CodePlace
-  })[],
+  })[] | undefined,
   /**
    * It allows nesting and creating additional `AddTransformParam` manipulation
    * within the scope that starts from the matched area.
@@ -64,8 +64,6 @@ type AddTransformParam = {
    * takes in matched groups object
    */
   WGroup?: (groups: MatchGroups) => void
-  getAllMatches?: (matches: RegExpExecArray[]) => void
-  getAllGroups?: (matches: MatchGroups[]) => void
 }
 /**
  * Takes in match object and returns matched groups object.
@@ -131,21 +129,13 @@ export class Transformer {
   addTransform(
     {
       regex, replace, add, addWGroup, replaceWGroup,
-      getAllMatches, getAllGroups, nestWGroup, nest,
-      WGroup
+      nestWGroup, nest, WGroup
     }: AddTransformParam,
     range?: [number, number]
   ) {
     regex.lastIndex = 0
     let match: RegExpExecArray | null;
-    let matchList: ABorNA<RegExpExecArray[], MatchGroups[]>
-    if (getAllGroups) {
-      matchList = ABorNA.A([])
-    } else if (getAllMatches) {
-      matchList = ABorNA.B([])
-    } else {
-      matchList = ABorNA.NA
-    }
+
     if (range) {
       regex.lastIndex = range[0]
     }
@@ -153,15 +143,6 @@ export class Transformer {
       // const { /* indices, */ groups } = match
       const start = match.index, end = regex.lastIndex
       if (range && range[1] < end) break
-      matchList.match({
-        A: (list) => {// @ts-ignore: match is not null 
-          list.push(match)
-        },
-        B: (list) => {// @ts-ignore: match is not null 
-          list.push(getGroups(match))
-        },
-        NA: () => { }
-      })
 
       if (replace || replaceWGroup) {
         const overlap = this.modifying.find(({ range: [mStart, mEnd] }) =>
@@ -177,10 +158,10 @@ export class Transformer {
             + "\n--------------------------")
         } else {
           let replaceWith: string | undefined
-          if(replaceWGroup) replaceWith = replaceWGroup(getGroups(match))
-          else if(replace) replaceWith = replace(match)
+          if (replaceWGroup) replaceWith = replaceWGroup(getGroups(match))
+          else if (replace) replaceWith = replace(match)
 
-          if(replaceWith){
+          if (replaceWith) {
             this.modifying.push({
               range: [start, end],
               replaceWith
@@ -197,15 +178,11 @@ export class Transformer {
       }
       WGroup?.(getGroups(match))
       if (addingInfo || nestWGroup || nest) {
-        const scopeBlocks = this.scopeBlocks.match({
-          // previous `addTransform` call already cached scopeBlocks.
-          Some: (blocks) => blocks,
-          None: () => {
-            // parsing
-            const blocks = analyzeBrackets(this.code)
-            this.scopeBlocks = Some(blocks)
-            return blocks
-          }
+        const scopeBlocks = this.scopeBlocks.unwrap_or_else(() => {
+          // parsing
+          const blocks = analyzeBrackets(this.code)
+          this.scopeBlocks = Some(blocks)
+          return blocks
         })
         if (nestWGroup || nest) {
           const range = [
@@ -224,31 +201,27 @@ export class Transformer {
         addingInfo?.forEach(({ adding, scope, place }) => {
 
           const index = scopeBlocks.getIndex(start, end, scope, place)
-          if (
-            /* true if no overlap */
-            this.modifying.every(({ range: [mStart, mEnd] }) =>
-              index < mStart || mEnd <= index
+          const overlap = this.modifying.find(({ range: [mStart, mEnd] }) =>
+            mStart <= index && index < mEnd
+          )
+          if (overlap) {
+            throw new Error(
+              "Overlapped Adding:\n"
+              + "-----Adding: -----\n"
+              + adding
+              + "\n-----Overlapped with: -----\n"
+              + overlap.replaceWith
+              + "\n----------------"
             )
-          ) {
+          } else {
             this.modifying.push({
               range: [index, index],
               replaceWith: adding
             })
-          } else {
-            throw new Error("Overlapped Adding")
           }
         })
       }
     }
-    matchList.match({
-      A: (list) => {
-        getAllMatches?.(list)
-      },
-      B: (list) => {
-        getAllGroups?.(list)
-      },
-      _: () => { }
-    })
   }
   /**
    * Call this method after 
@@ -266,11 +239,5 @@ export class Transformer {
         shift += replaceWith.length - end + start
       })
     return code
-  }
-}
-
-export function assertObj(condition: any): asserts condition {
-  if (!condition) {
-    throw new Error('');
   }
 }

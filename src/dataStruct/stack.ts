@@ -11,7 +11,9 @@ export class Stack<T> {
   push(data: T) {
     if (this.top) {
       this.top = this.top.add(data)
-    } else this.top = new Node(data)
+    } else {
+      this.top = new Node(data)
+    }
   }
   pop() {
     const topData = this.top?.data

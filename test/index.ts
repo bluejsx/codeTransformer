@@ -1,60 +1,6 @@
 // import { assert, fail, assertEquals } from "https://deno.land/std/testing/asserts.ts";
-import { Transformer, Scope, CodePlace, assertObj } from '../src/index.ts'
-// Deno.test({
-//   name: "tr-1",
-//   fn() {
-//     assertEquals(1, 1)
-//   }
-// });
+import { Transformer, Scope, CodePlace } from '../src/index.ts'
 
-
-
-`const ppp = Blue.r(Comp2, { class: 'hello' })
-
-// --- first scope ---
-ppp.blahblah = 3
-
-const { doThings } = ppp
-
-doThings.apple(56)
-// -----
-
-self.onclick = () =>{
-  // inner scope
-  ppp.blahblah++
-}
-
-`;
-
-
-`const ppp = Blue.r(Comp2, { class: 'hello' })
-
-// --- first scope ---
-
-ppp.blahblah = 3
-ppp.__add_mod(ppp=>{ ppp.blahblah = 3 })
-// rm: const { doThings } = ppp
-
-ppp.doThings.apple(56)
-ppp.__add_mod(ppp=>{ ppp.doThings.apple(56) })
-
-// -----
-
-self.onclick = () =>{
-  // inner func scope
-  ppp.__newestElem.blahblah++
-}
-`;
-
-
-`const ppp = Blue.r(Comp2, { class: 'hello' })
-
-ppp.blahblah = 3
-ppp.__add_mod(ppp=>{ ppp.blahblah = 3 })
-
-const { doThings } = ppp
-
-doThings.apple(56)`;
 
 
 `import { Comp, Comp2 } from '../file'
@@ -86,7 +32,6 @@ export default (_bjsx_comp_attr)=>{
 export const AA = ({ children }) => Blue.r('div', null, children)
 
 // {
-
 /*
   {
 */
@@ -119,7 +64,7 @@ export default ({ attr1, children })=>{
   )
   return self
 }
-export const AA = ({ children }) => Blue.r('div', null, children)
+export const AA = ({ children }) => ( Blue.r('div', null, children) )
 
 // {
 
@@ -137,10 +82,13 @@ export const BB = ({ children })=>{
     children
   )
   const { p } = reff
-  p.value = 90
+p.value = 90
   const { unko, ahyo } = p
   unko.get(4)
   ahyo(345)
+  p.hi.yo({
+    u:56
+  })
 
   pp.er = 90
   return self
@@ -148,31 +96,27 @@ export const BB = ({ children })=>{
 
 document.body.append(Blue.r(AA, null))
 `
-export default () => { }
-export const Unko = () => { }
-const Unko2 = () => { }
 
-export { Unko2 }
 
 const t0 = new Transformer(code)
 // arrow functions into normal functions
 t0.addTransform({
-  regex: /export +(?:default|const (?<name>[A-Z]\w*) *=) *\((?<param>[\w, {}\[\]]*)\) *=> *\n? *(?:(?<bracket>{)|Blue.r\()/g,
-  replaceWGroup({ name, param, bracket }) {
+  regex: /export +(?:default|const (?<name>[A-Z]\w*) *=) *\((?<param>[\w, {}\[\]]*)\) *=>[ \n]*(?:{|(?<bstart>(?:\([ \n]*)?Blue.r\())/g,
+  replaceWGroup({ name, param, bstart }) {
     let replacement = ''
     if (name) {
       replacement = `export function ${name}(${param}){`
     } else {
       replacement = `export default function(${param}){`
     }
-    if (!bracket) {
-      replacement += ' const self = Blue.r('
+    if (bstart) {
+      replacement += ' const self =' + bstart
     }
     return replacement
   },
-  addWGroup({ bracket }) {
+  addWGroup({ bstart }) {
     const adding = []
-    if (!bracket) {
+    if (bstart) {
       adding.push({
         adding: '; return self }',
         scope: Scope.SAME,
@@ -183,21 +127,57 @@ t0.addTransform({
   }
 })
 
-code = t0.transform()
+code = t0.transform();
 
 
 const SELF_UPDATER = (self_name: string, expt_name: string) =>
-  `if(import.meta.hot){
-  ${self_name}.__newestElem = ${self_name}
+  `//-----------------------------
+if(import.meta.hot){
+  ${self_name}.__canUpdate = true
+  //---------------
+  ${self_name}.__mod_props = new Map()
+  ${self_name}.__prop_accessed = new Set()
+  //---------------
+  const p_handler = {
+    get(target, prop){
+      target.__prop_accessed.add(prop)
+      return Reflect.get(...arguments);
+    },
+    set(target, prop, value) {
+      target.__mod_props.set(prop, value)
+      target[prop] = value;
+      return true;
+    }
+  }
+  ${self_name}.__newestElem = new Proxy(${self_name}, p_handler)
+  
   import.meta.hot.accept(({ ${expt_name} })=>{
+    if(!${self_name}.__canUpdate) import.meta.hot.decline()
     const newElem = Blue.r(${expt_name}, _bjsx_comp_attr, _bjsx_comp_attr.children)
-    ${self_name}.__newestElem = newElem
+    try{
+      //---------------
+      newElem.__mod_props = ${self_name}.__mod_props;
+      for(const [key, value] of newElem.__mod_props.entries()){
+        newElem[key] = value
+      }
+      newElem.__prop_accessed = ${self_name}.__prop_accessed
+      for(const pname of newElem.__prop_accessed){
+        if(newElem[pname] !== ${self_name}[pname]){
+          
+        }
+      }
+      //---------------
+    } catch(_){
+      import.meta.hot.decline()
+    }
+    ${self_name}.__newestElem = new Proxy(newElem, p_handler)
     ${self_name}.before(newElem)
     ${self_name}.remove()
   })
 }
 `
 const t1 = new Transformer(code)
+// move the function parameter
 t1.addTransform({
   regex: /(?<rest>export(?: +default)? +function(?: +[A-Z]\w*)? *)\( *(?<param>{[\w, ]*}) *\) *\{/g,
   replaceWGroup({ rest }) {
@@ -214,30 +194,52 @@ t1.addTransform({
 t1.addTransform({
   regex: /export(?: +default)? +function(?: +(?<name>[A-Z]\w*))? *\([\w{},: ]*\) *\{/g,
   nestWGroup({ name }, range) {
+    /**
+     * ```ts
+     * elem.blahblah = 3
+     * const { blah } = elem
+     * blah(45)
+     * ```
+     * -->
+     * ```ts
+     * elem.__newestElem.blahblah = 3
+     * const { blah } = elem
+     * elem.__newestElem.blah(45)
+     * ```
+     */
 
     const modElem = (elem: string) => {
       t1.addTransform({
-        regex: new RegExp(`[^\\w]${elem}\\.`, 'g'),
-        replace: (match) => `${match[0]}__newestElem.`
+        regex: new RegExp(`[^\\w]${elem}\\s*\\.`, 'g'),
+        replace: (match) => `${match[0]}__newestElem.`,
+        // add(match){
+        //   return [{
+        //     adding: `__newestElem.`,
+        //     scope: Scope.SAME,
+        //     place: CodePlace.AFTER
+        //   }]
+        // }
       }, range)
+
       t1.addTransform({
-        regex: new RegExp(`{(?<tookProp>[\\w\\n, ]+)} *= *${elem}`, 'g'),
+        regex: new RegExp(`{(?<tookProp>[\\s,]+)} *= *${elem}`, 'g'),
         WGroup({ tookProp }) {
           tookProp.replace(/[\n ]+/g, '').split(',').forEach(prop => {
             t1.addTransform({
-              regex: new RegExp(`([^\\w])${prop}([\\.\\(])`, 'g'),
+              regex: new RegExp(`[^\\w]${prop}\\s*\\.`, 'g'),
               replace(match) {
-                return `${match[1]}${elem}.__newestElem.${prop}${match[2]}`
-              }
+                return `${match[0]}__newestElem.`
+              },
             }, range)
           })
         }
       }, range)
     }
-    
+
     return [
       {
         regex: /return (?<self>\w+)/g,
+        // places self-updater right before the return statement
         addWGroup({ self }) {
           return [{
             adding: SELF_UPDATER(self, name || 'default'),
@@ -248,15 +250,33 @@ t1.addTransform({
       },
       {
         regex: /(?:(?:const|let) +(?<varname>\w+) *= *)?(?<rest>Blue\.r\([A-Z]\w*)/g,
+        // turn elements made from other Blue component updatable
         replaceWGroup({ varname, rest }) {
           if (varname) {
             return `let ${varname} = ${rest}`
           }
         },
+        WGroup({ varname }) {
+          if (varname) {
+            t1.addTransform({
+              regex: /return (?<self>\w+)/g,
+              addWGroup({ self }) {
+                if (varname === self) {
+                  return [{
+                    adding: `${self}.__canUpdate = false\n`,
+                    scope: Scope.SAME,
+                    place: CodePlace.BEFORE
+                  }]
+                }
+                return []
+              }
+            }, range)
+          }
+        },
         nestWGroup({ varname }) {
           if (varname) {
             modElem(varname)
-            return [] as ReturnType<NonNullable<typeof this.nestWGroup>>
+            return []
           } else {
             return [{
               regex: /ref: *\[ *[\w]+, *['"](?<refname>[\w]*)['"]\]/g,
@@ -273,3 +293,31 @@ t1.addTransform({
 
 const result = t1.transform()
 console.log(result)
+
+
+// // elem.a.b = 45
+// // elem.__add_mod_prop('a.b')
+// t1.addTransform({
+//   regex: new RegExp(`[^\\w]${elem}(?: |\\n)*\\.([.\\w \\n]+)=`, 'g'),
+//   add: (match) => {
+//     return [{
+//       adding: `\n${elem}.__add_mod_prop("${match[1]}");`,
+//       scope: Scope.SAME,
+//       place: CodePlace.BEFORE
+//     }]
+//   }
+// }, range)
+// // elem.a.c(45)
+// // elem.__add_func_passed('a.c', 45)
+// t1.addTransform({
+//   regex: new RegExp(`[^\\w]${elem}(?: |\\n)*\\.([.\\w \\n]+)\\(`, 'g'),
+//   nest(match, range) {
+//     let pass = ''
+
+//     return [{
+//       adding: `\n${elem}.__add_func_passed('${match[0]}', ${pass});`,
+//       scope: Scope.SAME,
+//       place: CodePlace.AFTER
+//     }]
+//   }
+// }, range)
