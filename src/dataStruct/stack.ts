@@ -1,9 +1,7 @@
 class Node<T> {
-  next: Node<T> | undefined
   constructor(public data: T, public prev?: Node<T>) { }
   add(data: T) {
-    this.next = new Node(data, this)
-    return this.next
+    return new Node<T>(data, this)
   }
 }
 export class Stack<T> {

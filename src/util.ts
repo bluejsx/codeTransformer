@@ -38,10 +38,10 @@ export type CodeScopeBlocks = {
   getIndex: IndexGetter
 }
 
-const bracketMatches = (open: string, close: string) =>{
-  if(open==='{' && close==='}') return true
-  if(open==='[' && close===']') return true
-  if(open==='(' && close===')') return true
+const bracketMatches = (open: string, close: string) => {
+  if (open === '{' && close === '}') return true
+  if (open === '[' && close === ']') return true
+  if (open === '(' && close === ')') return true
   return false
 }
 
@@ -65,7 +65,7 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
       place
     ) => getIndexFromPosition(code, blocks, partStart, partEnd, scope, place)
   }
-  const blockStack = new Stack<['{'|'['|'(', ScopeBlock]>()
+  const blockStack = new Stack<['{' | '[' | '(', ScopeBlock]>()
   const parentStack = new Stack<ScopeBlock>()
   const root = {
     outerStart: 0,
@@ -75,16 +75,27 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   root.parentFuncOrRoot = root
   parentStack.push(root)
   let com_match: RegExpExecArray | null;
-
+  let com_no_more_found = false
   const indexInComment = (index: number): boolean => {
+    if (com_no_more_found) {
+      // no need to search comment
+      return false
+    }
     if (!com_match) {
       com_match = reg_comments.exec(code)
-      if (!com_match) return false
+      if (!com_match) {
+        // no more comment in code
+        com_no_more_found = true
+        return false
+      }
     }
     const start = com_match.index, end = reg_comments.lastIndex
     if (end < index) {
       com_match = reg_comments.exec(code)
-      if (!com_match) return false
+      if (!com_match) {
+        // no more comment in code
+        com_no_more_found = true
+      }
       return indexInComment(index)
     }
     if (start < index && index < end) {
@@ -121,7 +132,7 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
       if (!top) {
         throw new Error('closing bracket without opening')
       }
-      if(bracketMatches(top[0], char)){
+      if (bracketMatches(top[0], char)) {
         // closing a scope
         blockStack.pop()
         const scope = top[1]
