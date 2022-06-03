@@ -11,7 +11,7 @@ await build({
   },
   package: {
     // package.json properties
-    name: "bluejsx/code-transformer",
+    name: "@bluejsx/code-transformer",
     version: Deno.args[0],
     description: "TS/JS code transformer made for BlueJSX plugins",
     license: "MIT",
