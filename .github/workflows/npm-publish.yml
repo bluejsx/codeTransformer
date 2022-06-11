@@ -21,7 +21,7 @@ jobs:
           deno-version: v1.x
       - run: deno run -A scripts/build_npm.ts ${{ github.event.release.tag_name }}
       - run: npm ci
-      - run: npm publish npm
+      - run: cd npm && npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.npm_token}}
 
