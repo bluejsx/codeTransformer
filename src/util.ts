@@ -9,6 +9,7 @@ export enum Scope {
   PARENT,
   PARENT_FUNC,
   SAME,
+  NONE,
   CHILD
 }
 /**
@@ -53,7 +54,7 @@ const bracketMatches = (open: string, close: string) => {
 export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   const reg_comments = /(?<b>['"`])(?:(?!\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
   const reg_brackets = /(?:function[\w ]*\([\w{},\[\] ]*\) *{)|{|\[|\(|}|\]|\)/g
-  
+
   const blocks: ScopeBlock[] = []
   const codeScopeBlocks: CodeScopeBlocks = {
     blocks,

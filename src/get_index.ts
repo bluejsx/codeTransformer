@@ -23,6 +23,11 @@ export function getIndexFromPosition(
   scope: Scope,
   place: CodePlace
 ): number {
+  if(scope === Scope.NONE){
+    if(place === CodePlace.START) return partStart
+    if(place === CodePlace.END) return partEnd
+    scope = Scope.FILE_ROOT
+  }
   if (scope === Scope.FILE_ROOT) {
     if (place === CodePlace.START) return 0
     if (place === CodePlace.END) return code.length
