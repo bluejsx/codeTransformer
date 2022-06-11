@@ -136,11 +136,20 @@ if(import.meta.hot){
   ${self_name}.__canUpdate = true
   //---------------
   ${self_name}.__mod_props = new Map()
-  ${self_name}.__prop_accessed = new Set()
+  ${self_name}.__func_call = new Map()
+  
   //---------------
   const p_handler = {
     get(target, prop){
-      target.__prop_accessed.add(prop)
+      if(typeof target[prop] === "function"){
+        return (...args)=>{
+          target.__func_call.set(prop, args)
+          return target[prop](...args)
+        }
+      } else if(!Object.getOwnPropertyDescriptor(target, prop).get){
+        // if prop is not a function & not a getter
+        target.__canUpdate = false
+      }
       return Reflect.get(...arguments);
     },
     set(target, prop, value) {
@@ -160,12 +169,12 @@ if(import.meta.hot){
       for(const [key, value] of newElem.__mod_props.entries()){
         newElem[key] = value
       }
-      newElem.__prop_accessed = ${self_name}.__prop_accessed
-      for(const pname of newElem.__prop_accessed){
-        if(newElem[pname] !== ${self_name}[pname]){
-          
-        }
+
+      newElem.__func_call = ${self_name}.__func_call
+      for(const [key, value] of newElem.__func_call.entries()){
+        newElem[key](...value)
       }
+
       //---------------
     } catch(_){
       import.meta.hot.decline()
@@ -211,27 +220,21 @@ t1.addTransform({
     const modElem = (elem: string) => {
       t1.addTransform({
         regex: new RegExp(`[^\\w]${elem}\\s*\\.`, 'g'),
-        replace: (match) => `${match[0]}__newestElem.`,
-        // add(match){
-        //   return [{
-        //     adding: `__newestElem.`,
-        //     scope: Scope.SAME,
-        //     place: CodePlace.AFTER
-        //   }]
-        // }
+        // replace: (match) => `${match[0]}__newestElem.`,
+        add(){
+          return [{
+            adding: `__newestElem.`,
+            scope: Scope.SAME,
+            place: CodePlace.AFTER
+          }]
+        }
       }, range)
 
       t1.addTransform({
-        regex: new RegExp(`{(?<tookProp>[\\s,]+)} *= *${elem}`, 'g'),
-        WGroup({ tookProp }) {
-          tookProp.replace(/[\n ]+/g, '').split(',').forEach(prop => {
-            t1.addTransform({
-              regex: new RegExp(`[^\\w]${prop}\\s*\\.`, 'g'),
-              replace(match) {
-                return `${match[0]}__newestElem.`
-              },
-            }, range)
-          })
+        regex: new RegExp(`{[\\w\\s,]+} *= *${elem}([^\\w])`, 'g'),
+        replace(match) {
+          const [m0, m1] = match
+          return m0.substring(0, m0.length - 1) + `.__newestElem${m1}`
         }
       }, range)
     }
@@ -293,31 +296,3 @@ t1.addTransform({
 
 const result = t1.transform()
 console.log(result)
-
-
-// // elem.a.b = 45
-// // elem.__add_mod_prop('a.b')
-// t1.addTransform({
-//   regex: new RegExp(`[^\\w]${elem}(?: |\\n)*\\.([.\\w \\n]+)=`, 'g'),
-//   add: (match) => {
-//     return [{
-//       adding: `\n${elem}.__add_mod_prop("${match[1]}");`,
-//       scope: Scope.SAME,
-//       place: CodePlace.BEFORE
-//     }]
-//   }
-// }, range)
-// // elem.a.c(45)
-// // elem.__add_func_passed('a.c', 45)
-// t1.addTransform({
-//   regex: new RegExp(`[^\\w]${elem}(?: |\\n)*\\.([.\\w \\n]+)\\(`, 'g'),
-//   nest(match, range) {
-//     let pass = ''
-
-//     return [{
-//       adding: `\n${elem}.__add_func_passed('${match[0]}', ${pass});`,
-//       scope: Scope.SAME,
-//       place: CodePlace.AFTER
-//     }]
-//   }
-// }, range)
