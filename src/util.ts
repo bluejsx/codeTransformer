@@ -45,16 +45,15 @@ const bracketMatches = (open: string, close: string) => {
   return false
 }
 
-const reg_comments = /(?<b>['"`])(?:(?!\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
-const reg_brackets = /(?:function[\w ]*\([\w{},\[\] ]*\) *{)|{|\[|\(|}|\]|\)/g
 
 /**
  * Analyzes the brackets in the code then 
  * creates object that has scope info
  */
 export const analyzeBrackets = (code: string): CodeScopeBlocks => {
-  reg_comments.lastIndex = 0
-  reg_brackets.lastIndex = 0
+  const reg_comments = /(?<b>['"`])(?:(?!\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
+  const reg_brackets = /(?:function[\w ]*\([\w{},\[\] ]*\) *{)|{|\[|\(|}|\]|\)/g
+  
   const blocks: ScopeBlock[] = []
   const codeScopeBlocks: CodeScopeBlocks = {
     blocks,
