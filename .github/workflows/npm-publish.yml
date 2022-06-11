@@ -11,17 +11,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 16
-          registry-url: https://registry.npmjs.org/
-      - run: npm ci
+      # - uses: actions/checkout@v3
+      # - uses: actions/setup-node@v3
+      #   with:
+      #     node-version: 16
+      #     registry-url: https://registry.npmjs.org/
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
       - run: deno run -A scripts/build_npm.ts ${{ github.event.release.tag_name }}
-      - run: npm publish npm
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: ./npm/package.json
+          token: ${{ secrets.NPM_TOKEN }}
 
