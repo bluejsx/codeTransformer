@@ -133,33 +133,7 @@ code = t0.transform();
 const SELF_UPDATER = (self_name: string, expt_name: string) =>
   `//-----------------------------
 if(import.meta.hot){
-  ${self_name}.__canUpdate = true
-  //---------------
-  ${self_name}.__mod_props = new Map()
-  ${self_name}.__func_call = new Map()
-  
-  //---------------
-  const p_handler = {
-    get(target, prop){
-      if(typeof target[prop] === "function"){
-        return (...args)=>{
-          target.__func_call.set(prop, args)
-          return target[prop](...args)
-        }
-      } else if(!Object.getOwnPropertyDescriptor(target, prop).get){
-        // if prop is not a function & not a getter
-        target.__canUpdate = false
-      }
-      return Reflect.get(...arguments);
-    },
-    set(target, prop, value) {
-      target.__mod_props.set(prop, value)
-      target[prop] = value;
-      return true;
-    }
-  }
-  ${self_name}.__newestElem = new Proxy(${self_name}, p_handler)
-  
+  const p_handler = hmrload(${self_name});
   import.meta.hot.accept(({ ${expt_name} })=>{
     if(!${self_name}.__canUpdate) import.meta.hot.decline()
     const newElem = Blue.r(${expt_name}, _bjsx_comp_attr, _bjsx_comp_attr.children)

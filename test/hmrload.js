@@ -25,4 +25,5 @@ export const hmrload = (self) => {
     },
   };
   self.__newestElem = new Proxy(self, p_handler);
+  return p_handler;
 };
