@@ -24,8 +24,8 @@ export function getIndexFromPosition(
   place: CodePlace
 ): number {
   if(scope === Scope.NONE){
-    if(place === CodePlace.START) return partStart
-    if(place === CodePlace.END) return partEnd
+    if(place === CodePlace.BEFORE) return partStart
+    if(place === CodePlace.AFTER) return partEnd
     scope = Scope.FILE_ROOT
   }
   if (scope === Scope.FILE_ROOT) {
