@@ -1,4 +1,4 @@
-import { Scope, CodePlace, Option, CodeScopeBlocks, None, analyzeBrackets, Some } from "./util.ts";
+import { Scope, CodePlace, Option, CodeScopeBlocks, None, Some, analyzeBrackets, rangeIsInCommentDetector } from "./util.ts";
 export { Scope, CodePlace }
 
 type MatchGroups = {
@@ -96,8 +96,18 @@ export class Transformer {
     range: [number, number],
     replaceWith: string
   }[] = []
-  scopeBlocks: Option<CodeScopeBlocks> = None
+  private scopeBlocks: Option<CodeScopeBlocks> = None
+  /**
+   * list of [start, end] positions of comments, in order of index.
+   */
+  private comment_positions: [number, number][] = []
   constructor(private code: string) {
+    const reg_comments = /(?<b>['"`])(?:(?!(?<!\\)\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
+    let match: RegExpExecArray | null;
+    while ((match = reg_comments.exec(this.code)) !== null) {
+      const start = match.index, end = reg_comments.lastIndex
+      this.comment_positions.push([start, end])
+    }
   }
   /**
    * Example:
@@ -139,10 +149,17 @@ export class Transformer {
     if (range) {
       regex.lastIndex = range[0]
     }
+
+    const { range_is_in_comment } = rangeIsInCommentDetector(this.comment_positions)
     while ((match = regex.exec(this.code)) !== null) {
       // const { /* indices, */ groups } = match
       const start = match.index, end = regex.lastIndex
-      if (range && range[1] < end) break
+      if (range && range[1] < end) {
+        break
+      }
+      if (range_is_in_comment(start, end)) {
+        continue
+      }
 
       if (replace || replaceWGroup) {
         const overlap = this.modifying.find(({ range: [mStart, mEnd] }) =>
@@ -180,7 +197,10 @@ export class Transformer {
       if (addingInfo || nestWGroup || nest) {
         const scopeBlocks = this.scopeBlocks.unwrap_or_else(() => {
           // parsing
-          const blocks = analyzeBrackets(this.code)
+          const blocks = analyzeBrackets(
+            this.code,
+            this.comment_positions
+          )
           this.scopeBlocks = Some(blocks)
           return blocks
         })

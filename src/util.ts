@@ -46,13 +46,42 @@ const bracketMatches = (open: string, close: string) => {
   return false
 }
 
-
+export const rangeIsInCommentDetector = (comment_positions: [number, number][]) => {
+  const { length } = comment_positions
+  let i = 0
+  let reachedEnd = false
+  return {
+    /**
+     * Returns true if the range is in a comment.
+     * 
+     * **Expected to use in repeatedly in increasing order** because 
+     * the function never goes back to already checked comments.
+     */
+    range_is_in_comment: (start: number, end: number) => {
+      if (reachedEnd) return false
+      for (; i < length; i++) {
+        const [comment_start, comment_end] = comment_positions[i]
+        if (comment_end <= start) {
+          continue
+        }
+        if (end <= comment_start) {
+          return false
+        }
+        if (comment_start <= start && end <= comment_end) {
+          return true
+        }
+      }
+      reachedEnd = true
+      return false
+    }
+  }
+}
 /**
  * Analyzes the brackets in the code then 
  * creates object that has scope info
  */
-export const analyzeBrackets = (code: string): CodeScopeBlocks => {
-  const reg_comments = /(?<b>['"`])(?:(?!\k<b>)[\s\S])*\k<b>|\/\/.*\n|\/\*(?:(?!\*\/)[\s\S])*\*\//g
+export const analyzeBrackets = (code: string, comment_positions: [number, number][]): CodeScopeBlocks => {
+  const { range_is_in_comment } = rangeIsInCommentDetector(comment_positions)
   const reg_brackets = /(?:function[\w ]*\([\w{},\[\] ]*\) *{)|{|\[|\(|}|\]|\)/g
 
   const blocks: ScopeBlock[] = []
@@ -74,39 +103,10 @@ export const analyzeBrackets = (code: string): CodeScopeBlocks => {
   } as ScopeBlock
   root.parentFuncOrRoot = root
   parentStack.push(root)
-  let com_match: RegExpExecArray | null;
-  let com_no_more_found = false
-  const indexInComment = (index: number): boolean => {
-    if (com_no_more_found) {
-      // no need to search comment
-      return false
-    }
-    if (!com_match) {
-      com_match = reg_comments.exec(code)
-      if (!com_match) {
-        // no more comment in code
-        com_no_more_found = true
-        return false
-      }
-    }
-    const start = com_match.index, end = reg_comments.lastIndex
-    if (end < index) {
-      com_match = reg_comments.exec(code)
-      if (!com_match) {
-        // no more comment in code
-        com_no_more_found = true
-      }
-      return indexInComment(index)
-    }
-    if (start < index && index < end) {
-      return true
-    }
-    return false
-  }
   let match: RegExpExecArray | null;
   while ((match = reg_brackets.exec(code)) !== null) {
     const index = match.index
-    if (indexInComment(index)) continue;
+    if (range_is_in_comment(index, index)) continue;
     const char = match[0]
     if (char.charAt(0) === 'f') {
       const funcScope = {
