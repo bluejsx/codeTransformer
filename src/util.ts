@@ -54,7 +54,7 @@ export const rangeIsInCommentDetector = (comment_positions: [number, number][]) 
     /**
      * Returns true if the range is in a comment.
      * 
-     * **Expected to use in repeatedly in increasing order** because 
+     * **Expected to be used repeatedly in increasing order of index** because 
      * the function never goes back to already checked comments.
      */
     range_is_in_comment: (start: number, end: number) => {

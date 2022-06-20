@@ -98,7 +98,9 @@ export class Transformer {
   }[] = []
   private scopeBlocks: Option<CodeScopeBlocks> = None
   /**
-   * list of [start, end] positions of comments, in order of index.
+   * list of `[start, end]` positions of comments.
+   * 
+   * The items are lined in order.
    */
   private comment_positions: [number, number][] = []
   constructor(private code: string) {
