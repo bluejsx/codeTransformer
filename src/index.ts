@@ -47,7 +47,10 @@ type AddTransformParam = {
    * 
    * The range would be useful to use with `.addTransform({...}, range)`
    */
-  nest?: (match: RegExpExecArray, range: [number, number]) => AddTransformParam[],
+  nest?: (
+    match: RegExpExecArray,
+    range: [number, number]
+  ) => AddTransformParam[] | undefined,
   /**
    * It allows nesting and creating additional `AddTransformParam` manipulation
    * within the scope that starts from the matched area.
@@ -59,7 +62,7 @@ type AddTransformParam = {
   nestWGroup?: (
     groups: MatchGroups,
     range: [number, number]
-  ) => AddTransformParam[],
+  ) => AddTransformParam[] | undefined,
   /**
    * takes in matched groups object
    */
